@@ -5,10 +5,20 @@
 (defgeneric value (bson key))
 (defgeneric (setf value) (value bson key))
 (defgeneric bson= (x y))
+(defgeneric encode (bson))
 
 (defclass bson ()
   ((head :initform nil)
    (tail :initform nil)))
+
+(defmethod print-object ((bson bson) stream)
+  (with-slots (head) bson
+    (format stream "{~{~a~^, ~}}"
+            (loop for (key . value) in head
+                  collect (format nil "~s: ~a" key
+                                  (if (consp value)
+                                      (format nil "[~{~s~^, ~}]" value)
+                                      (format nil "~s" value)))))))
 
 (defmethod value ((bson bson) (key string))
   (with-slots (head) bson
@@ -38,11 +48,34 @@
                       (f (cdr a) (cdr b))))))
     (f (slot-value x 'head) (slot-value y 'head))))
 
+(defmethod encode ((bson bson))
+  (with-slots (head) bson
+    (let* ((data (fast-io:with-fast-output (out)
+                   (fast-io:write32-le 0 out) ;dummy document length.
+                   (loop for (key . value) in head
+                         for e-name = (babel:string-to-octets key :encoding :utf-8)
+                         do (encode-element e-name value out))
+                   (fast-io:fast-write-byte 0 out)))
+           (length (length data)))
+      (loop for i from 0 to 3
+            do (setf (aref data i) (ldb (byte 8 (* i 8)) length)))
+      data)))
+
+
 (defun bson (&rest args)
   (let ((bson (make-instance 'bson)))
-    (loop for (key value) on args by #'cddr
-          do (setf (value bson key) value))
-    bson))
+    (labels ((f (args)
+               (if (endp args)
+                   bson
+                   (let ((car (car args)))
+                     (if (consp car)
+                         (progn
+                           (setf (value bson (car car)) (cdr car))
+                           (f (cdr args)))
+                         (progn
+                           (setf (value bson car) (cadr args))
+                           (f (cddr args))))))))
+      (f args))))
 
 (defconstant +min-key+ '+min-key)
 (defconstant +max-key+ '+max-key)
@@ -65,6 +98,10 @@
 
 (defclass object-id ()
   ((data :initarg :data)))
+
+(defmethod print-object ((object-id object-id) stream)
+  (format stream "ObjectId(\"~{~02,'0x~}\")"
+          (map 'list #'identity (slot-value object-id 'data))))
 
 (defclass db-pointer ()
   ((data :initarg :data :accessor data)))
@@ -106,11 +143,18 @@
 (defconstant +type-min-key+     #xFF "Min key")
 (defconstant +type-max-key+     #x7F "Max key")
 
-(defun decode (binary)
-  (declare (fast-io::octet-vector binary))
-  (let ((bson (make-instance 'bson)))
-    (fast-io:with-fast-input (in binary)
-      (%decode in bson))))
+(defgeneric decode (octet-vector-or-stream))
+
+(defmethod decode ((vector vector))
+  (fast-io:with-fast-input (in vector)
+    (decode in)))
+
+(defmethod decode ((stream stream))
+  (fast-io:with-fast-input (in nil stream)
+    (decode in)))
+
+(defmethod decode ((in fast-io::input-buffer))
+  (%decode in (make-instance 'bson)))
 
 (defun %decode (in bson)
   (let ((total-size (fast-io:read32-le in)))
@@ -139,15 +183,36 @@
   (parse-cstring in))
 
 (defgeneric decode-element (type in))
+(defgeneric encode-element (e-name value out))
+
+(defmacro def-encode ((type class value out) &body body)
+  (let ((e-name (gensym "e-name")))
+    `(defmethod encode-element (,e-name (,value ,class) ,out)
+       (fast-io:fast-write-byte ,type ,out)
+       (fast-io:fast-write-sequence ,e-name ,out)
+       (fast-io:fast-write-byte 0 ,out)
+       ,@body)))
 
 (defmethod decode-element ((type (eql +type-double+)) in)
   (ieee-floats:decode-float64 (fast-io:read64-le in)))
 
+(def-encode (+type-double+ float value out)
+  (fast-io:write64-le (ieee-floats:encode-float64 value) out))
+
 (defmethod decode-element ((type (eql +type-string+)) in)
   (parse-string in))
 
+(def-encode (+type-string+ string value out)
+  (let ((x (babel:string-to-octets value :encoding :utf-8)))
+    (fast-io:write32-le (1+ (length x)) out) ;1+ is null termination.
+    (fast-io:fast-write-sequence x out)
+    (fast-io:fast-write-byte 0 out)))
+
 (defmethod decode-element ((type (eql +type-document+)) in)
   (%decode in (make-instance 'bson)))
+
+(def-encode (+type-document+ bson value out)
+  (fast-io:fast-write-sequence (encode value) out))
 
 (defmethod decode-element ((type (eql +type-array+)) in)
   (let ((total-size (fast-io:read32-le in)))
@@ -157,6 +222,13 @@
           collect (loop for x = (fast-io:fast-read-byte in)
                         until (zerop x)
                         finally (return (decode-element type in))))))
+
+(def-encode (+type-array+ list value out)
+  (let ((bson (make-instance 'bson)))
+    (loop for i from 0
+          for x in value
+          do (setf (value bson (princ-to-string i)) x))
+    (fast-io:fast-write-sequence (encode bson) out)))
 
 (defmethod decode-element ((type (eql +type-binary+)) in)
   (let* ((size (fast-io:read32-le in))
@@ -234,6 +306,9 @@
 
 (defmethod decode-element ((type (eql +type-int32+)) in)
   (fast-io:read32-le in))
+
+(def-encode (+type-int32+ integer value out) ;TODO not integer, but int32
+  (fast-io:write32-le value out))
 
 (defmethod decode-element ((type (eql +type-timestamp+)) in)
   (make-instance 'timestamp :data (fast-io:read64-le in)))
