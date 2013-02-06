@@ -22,11 +22,23 @@
 (defmethod print-object ((bson bson) stream)
   (with-slots (head) bson
     (format stream "{~{~a~^, ~}}"
-            (loop for (key . value) in head
+            (loop for (key . %value) in head
+                  for value = (print-object-value %value)
                   collect (format nil "~s: ~a" key
                                   (if (consp value)
-                                      (format nil "[~{~s~^, ~}]" value)
-                                      (format nil "~s" value)))))))
+                                      (format nil "[~{~a~^, ~}]" (mapcar #'print-object-value value))
+                                      (format nil "~a" value)))))))
+
+(defun print-object-value (value)
+  (case value
+    (+bson-true+ "true")
+    (+bson-false+ "false")
+    (+bson-undefined+ "undefined")
+    (+bson-null+ "null")
+    (+bson-empty-array+ "[]")
+    (+bson-min-key+ "+min-key+")
+    (+bson-max-key+ "+max-key+")
+    (t (format nil "~s" value))))
 
 (defmethod value ((bson bson) (key string))
   (with-slots (head) bson
@@ -48,13 +60,7 @@
   (setf (value bson (string-downcase key)) value))
 
 (defmethod bson= ((x bson) (y bson))
-  (labels ((f (a b)
-             (if (null a)
-                 (null b)
-                 (and (equal (caar a) (caar b))
-                      (equal (cdar a) (cdar b))
-                      (f (cdr a) (cdr b))))))
-    (f (slot-value x 'head) (slot-value y 'head))))
+  (equalp (encode x) (encode y)))
 
 (defmethod encode ((bson bson))
   (with-slots (head) bson

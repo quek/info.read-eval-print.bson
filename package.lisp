@@ -4,5 +4,12 @@
   (:use #:cl)
   (:export #:encode #:decode #:bson #:bson= #:value
            #:javascript-code
-           #:code-wit-scope))
+           #:code-wit-scope
+           #:+bson-true+
+           #:+bson-false+
+           #:+bson-undefined+
+           #:+bson-null+
+           #:+bson-empty-array+
+           #:+bson-min-key+
+           #:+bson-max-key+))
 
