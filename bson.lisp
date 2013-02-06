@@ -117,6 +117,13 @@
   ((regex :initarg :regex)
    (options :initarg :options :initform "")))
 
+(defmethod print-object ((regex regex) stream)
+  (with-slots (regex options) regex
+    (format stream "/~a/~a" regex options)))
+
+(defun regex (regex &optional (options ""))
+  (make-instance 'regex :regex regex :options options))
+
 (defclass db-pointer ()
   ((data :initarg :data :accessor data)))
 
@@ -248,7 +255,7 @@
     (fast-io:fast-write-sequence (encode bson) out)))
 
 (def-encode (+type-array+ (eql +bson-empty-array+) value out)
-  (fast-io:fast-write-sequence #.(encode (bson)) out))
+  (fast-io:fast-write-sequence (encode (bson)) out))
 
 (defmethod decode-element ((type (eql +type-binary+)) in)
   (let* ((size (fast-io:read32-le in))
