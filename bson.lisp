@@ -7,6 +7,14 @@
 (defgeneric bson= (x y))
 (defgeneric encode (bson))
 
+(defconstant +bson-true+ '+bson-true+)
+(defconstant +bson-false+ '+bson-false+)
+(defconstant +bson-undefined+ '+bson-undefined+)
+(defconstant +bson-null+ '+bson-null+)
+(defconstant +bson-empty-array+ '+bson-empty-array+)
+(defconstant +bson-min-key+ '+bson-min-key+)
+(defconstant +bson-max-key+ '+bson-max-key+)
+
 (defclass bson ()
   ((head :initform nil)
    (tail :initform nil)))
@@ -76,10 +84,6 @@
                            (setf (value bson car) (cadr args))
                            (f (cddr args))))))))
       (f args))))
-
-(defconstant +min-key+ '+min-key)
-(defconstant +max-key+ '+max-key)
-(defconstant +undefined+ '+undefined+)
 
 (defclass binary-not-generic ()
   ((data :initarg :data :accessor data)))
@@ -254,7 +258,10 @@
        (make-instance 'binary-user-defined :data buffer)))))
 
 (defmethod decode-element ((type (eql +type-undefined+)) in)
-  +undefined+)
+  +bson-undefined+)
+
+(def-encode (+type-undefined+ (eql +bson-undefined+) value out)
+  )
 
 (defmethod decode-element ((type (eql +type-object-id+)) in)
   (let ((buffer (fast-io:make-octet-vector 12)))
@@ -278,6 +285,9 @@
 
 (defmethod decode-element ((type (eql +type-null+)) in)
   nil)
+
+(def-encode (+type-null+ (eql +bson-null+) value out))
+(def-encode (+type-null+ null value out))
 
 (defmethod decode-element ((type (eql +type-regex+)) in)
   (let ((regex (parse-cstring in))
@@ -317,7 +327,11 @@
   (fast-io:read64-le in))
 
 (defmethod decode-element ((type (eql +type-min-key+)) in)
-  +min-key+)
+  +bson-min-key+)
+
+(def-encode (+type-min-key+ (eql +bson-min-key+) value out))
 
 (defmethod decode-element ((type (eql +type-max-key+)) in)
-  +max-key+)
+  +bson-max-key+)
+
+(def-encode (+type-max-key+ (eql +bson-max-key+) value out))
