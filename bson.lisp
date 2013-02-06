@@ -107,6 +107,10 @@
   (format stream "ObjectId(\"~{~02,'0x~}\")"
           (map 'list #'identity (slot-value object-id 'data))))
 
+(defclass regex ()
+  ((regex :initarg :regex)
+   (options :initarg :options :initform "")))
+
 (defclass db-pointer ()
   ((data :initarg :data :accessor data)))
 
@@ -206,11 +210,14 @@
 (defmethod decode-element ((type (eql +type-string+)) in)
   (parse-string in))
 
-(def-encode (+type-string+ string value out)
-  (let ((x (babel:string-to-octets value :encoding :utf-8)))
+(defun encode-string (string out)
+  (let ((x (babel:string-to-octets string :encoding :utf-8)))
     (fast-io:write32-le (1+ (length x)) out) ;1+ is null termination.
     (fast-io:fast-write-sequence x out)
     (fast-io:fast-write-byte 0 out)))
+
+(def-encode (+type-string+ string value out)
+  (encode-string value out))
 
 (defmethod decode-element ((type (eql +type-document+)) in)
   (%decode in (make-instance 'bson)))
@@ -233,6 +240,9 @@
           for x in value
           do (setf (value bson (princ-to-string i)) x))
     (fast-io:fast-write-sequence (encode bson) out)))
+
+(def-encode (+type-array+ (eql +bson-empty-array+) value out)
+  (fast-io:fast-write-sequence #.(encode (bson)) out))
 
 (defmethod decode-element ((type (eql +type-binary+)) in)
   (let* ((size (fast-io:read32-le in))
@@ -257,31 +267,70 @@
       (#x08                             ;User defined
        (make-instance 'binary-user-defined :data buffer)))))
 
+(defgeneric binary-sub-type (x)
+  (:method ((x vector))
+    #x00))
+
+(def-encode (+type-binary+ vector value out)
+  (fast-io:write32-le (length value) out)
+  (fast-io:fast-write-byte (binary-sub-type value) out)
+  (fast-io:fast-write-sequence value out))
+
+(def-encode (+type-binary+ binary-not-generic value out)
+  (with-slots (data) value
+    (fast-io:write32-le (length data) out)
+    (fast-io:fast-write-byte (binary-sub-type value) out)
+    (fast-io:fast-write-sequence data out)))
+
+(def-encode (+type-binary+ binary-old value out)
+  (with-slots (data) value
+    (fast-io:write32-le (+ (length data) 4) out)
+    (fast-io:fast-write-byte (binary-sub-type value) out)
+    (fast-io:write32-le (length data) out)
+    (fast-io:fast-write-sequence data out)))
+
 (defmethod decode-element ((type (eql +type-undefined+)) in)
   +bson-undefined+)
 
-(def-encode (+type-undefined+ (eql +bson-undefined+) value out)
-  )
+(def-encode (+type-undefined+ (eql +bson-undefined+) value out))
 
 (defmethod decode-element ((type (eql +type-object-id+)) in)
   (let ((buffer (fast-io:make-octet-vector 12)))
     (fast-io:fast-read-sequence buffer in)
     (make-instance 'object-id :data buffer)))
 
+(def-encode (+type-object-id+ object-id value out)
+  (with-slots (data) value
+    (fast-io:fast-write-sequence data out)))
+
 (defmethod decode-element ((type (eql +type-false+)) in)
   (let ((value (fast-io:fast-read-byte in)))
     (assert (= #x00 value))
     nil))
+
+(def-encode (+type-false+ (eql +bson-false+) value out)
+  (fast-io:fast-write-byte #x00 out))
 
 (defmethod decode-element ((type (eql +type-true+)) in)
   (let ((value (fast-io:fast-read-byte in)))
     (assert (= #x01 value))
     t))
 
+(progn
+ (def-encode (+type-true+ (eql t) value out)
+   #1=(fast-io:fast-write-byte #x01 out))
+ (def-encode (+type-true+ (eql +bson-true+) value out)
+   #1#))
+
 (defmethod decode-element ((type (eql +type-datetime+)) in)
   (let ((x (fast-io:read64-le in)))
     ;; x is UTC milliseconds since the Unix epoch.
     (local-time:unix-to-timestamp (truncate x 1000) :nsec (* (mod x 1000) 1000))))
+
+(def-encode (+type-datetime+ local-time:timestamp value out)
+  (let ((unix (local-time:timestamp-to-unix value))
+        (nsec (local-time:nsec-of value)))
+    (fast-io:write64-le (+ (* unix 1000) nsec))))
 
 (defmethod decode-element ((type (eql +type-null+)) in)
   nil)
@@ -289,23 +338,43 @@
 (def-encode (+type-null+ (eql +bson-null+) value out))
 (def-encode (+type-null+ null value out))
 
-(defmethod decode-element ((type (eql +type-regex+)) in)
-  (let ((regex (parse-cstring in))
-        (options (parse-cstring in)))
+(defmethod to-ppcre-regex ((regex regex))
+  (with-slots (regex options) regex
     (ppcre:create-scanner regex
                           :multi-line-mode (find #\m options)
                           :case-insensitive-mode (find #\i options))))
+
+(defmethod decode-element ((type (eql +type-regex+)) in)
+  (let ((regex (parse-cstring in))
+        (options (parse-cstring in)))
+    (make-instance 'regex :regex regex :options options)))
+
+(def-encode (+type-regex+ regex value out)
+  (with-slots (regex options) value
+    (encode-string regex out)
+    (encode-string options out)))
 
 (defmethod decode-element ((type (eql +type-db-pointer+)) in)
   (let ((buffer (fast-io:make-octet-vector 12)))
     (fast-io:fast-read-sequence buffer in)
     (make-instance 'db-pointer :data buffer)))
 
+(def-encode (+type-db-pointer+ db-pointer value out)
+  (with-slots (data) value
+    (fast-io:fast-write-sequence data out)))
+
 (defmethod decode-element ((type (eql +type-java-script+)) in)
   (make-instance 'javascript-code :code (parse-string in)))
 
+(def-encode (+type-java-script+ javascript-code value out)
+  (with-slots (code) value
+   (encode-string code out)))
+
 (defmethod decode-element ((type (eql +type-symbol+)) in)
   (intern (parse-string in)))
+
+(def-encode (+type-symbol+ symbol value out)
+  (encode-string (symbol-name value) out))
 
 (defmethod decode-element ((type (eql +type-code-w-s+)) in)
   (let ((length (fast-io:read32-le in))
@@ -314,14 +383,38 @@
     (declare (ignore length))
     (make-instance 'code-with-scope :code code :scope scope)))
 
+(def-encode (+type-code-w-s+ code-with-scope value out)
+  (with-slots (code scope) value
+    (let* ((code (babel:string-to-octets code :encoding :utf-8))
+           (scope (encode scope))
+           (length (+ (length code) 1 (length scope))))
+      (fast-io:write32-le length out)
+      (fast-io:fast-write-sequence code out)
+      (fast-io:fast-write-byte 0 out)
+      (fast-io:fast-write-sequence scope out))))
+
 (defmethod decode-element ((type (eql +type-int32+)) in)
   (fast-io:read32-le in))
 
-(def-encode (+type-int32+ integer value out) ;TODO not integer, but int32
-  (fast-io:write32-le value out))
+(defmethod encode-element (e-name (value integer) out)
+  (cond ((< -2147483648 value 2147483647)
+         (fast-io:fast-write-byte +type-int32+ out)
+         (fast-io:fast-write-sequence e-name out)
+         (fast-io:write32-le value out))
+        ((<  -9223372036854775808 value 9223372036854775807)
+         (fast-io:fast-write-byte +type-int64+ out)
+         (fast-io:fast-write-sequence e-name out)
+         (fast-io:write64-le value out))
+        (t
+         (error "An integer value is too small or too large: ~d." value)))
+  (fast-io:fast-write-byte 0 out))
 
 (defmethod decode-element ((type (eql +type-timestamp+)) in)
   (make-instance 'timestamp :data (fast-io:read64-le in)))
+
+(def-encode (+type-timestamp+ timestamp value out)
+  (with-slots (data) value
+    (fast-io:write64-le value out)))
 
 (defmethod decode-element ((type (eql +type-int64+)) in)
   (fast-io:read64-le in))
