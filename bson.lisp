@@ -24,10 +24,7 @@
     (format stream "{~{~a~^, ~}}"
             (loop for (key . %value) in head
                   for value = (print-object-value %value)
-                  collect (format nil "~s: ~a" key
-                                  (if (consp value)
-                                      (format nil "[~{~a~^, ~}]" (mapcar #'print-object-value value))
-                                      (format nil "~a" value)))))))
+                  collect (format nil "~s: ~a" key value)))))
 
 (defun print-object-value (value)
   (case value
@@ -38,7 +35,10 @@
     (+bson-empty-array+ "[]")
     (+bson-min-key+ "+min-key+")
     (+bson-max-key+ "+max-key+")
-    (t (format nil "~s" value))))
+    (t
+     (if (consp value)
+         (format nil "[~{~a~^, ~}]" (mapcar #'print-object-value value))
+         (format nil "~s" value)))))
 
 (defmethod value ((bson bson) (key string))
   (with-slots (head) bson
