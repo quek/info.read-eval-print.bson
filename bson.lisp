@@ -400,14 +400,15 @@
   (cond ((< -2147483648 value 2147483647)
          (fast-io:fast-write-byte +type-int32+ out)
          (fast-io:fast-write-sequence e-name out)
+         (fast-io:fast-write-byte 0 out)
          (fast-io:write32-le value out))
         ((<  -9223372036854775808 value 9223372036854775807)
          (fast-io:fast-write-byte +type-int64+ out)
          (fast-io:fast-write-sequence e-name out)
+         (fast-io:fast-write-byte 0 out)
          (fast-io:write64-le value out))
         (t
-         (error "An integer value is too small or too large: ~d." value)))
-  (fast-io:fast-write-byte 0 out))
+         (error "An integer value is too small or too large: ~d." value))))
 
 (defmethod decode-element ((type (eql +type-timestamp+)) in)
   (make-instance 'timestamp :data (fast-io:read64-le in)))
