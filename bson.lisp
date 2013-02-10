@@ -149,8 +149,7 @@
 (defconstant +type-binary+      #x05 "Binary data")
 (defconstant +type-undefined+   #x06 "Undefined — Deprecated")
 (defconstant +type-object-id+   #x07 "ObjectId(byte*12)")
-(defconstant +type-false+       #x08 "Boolean false (#x00)")
-(defconstant +type-true+        #x08 "Boolean true (#x01)")
+(defconstant +type-boolean+     #x08 "Boolean true (#x01), false (#x00)")
 (defconstant +type-datetime+    #x09 "UTC datetime (int64)")
 (defconstant +type-null+        #x0A "Null value")
 (defconstant +type-regex+       #x0B "Regular expression (cstring)")
@@ -316,24 +315,16 @@
   (with-slots (data) value
     (fast-io:fast-write-sequence data out)))
 
-(defmethod decode-element ((type (eql +type-false+)) in)
+(defmethod decode-element ((type (eql +type-boolean+)) in)
   (let ((value (fast-io:fast-read-byte in)))
-    (assert (= #x00 value))
-    nil))
+    (= #x01 value)))
 
-(def-encode (+type-false+ (eql +bson-false+) value out)
+(def-encode (+type-boolean+ (eql +bson-false+) value out)
   (fast-io:fast-write-byte #x00 out))
-
-(defmethod decode-element ((type (eql +type-true+)) in)
-  (let ((value (fast-io:fast-read-byte in)))
-    (assert (= #x01 value))
-    t))
-
-(progn
- (def-encode (+type-true+ (eql t) value out)
-   #1=(fast-io:fast-write-byte #x01 out))
- (def-encode (+type-true+ (eql +bson-true+) value out)
-   #1#))
+(def-encode (+type-boolean+ (eql t) value out)
+  (fast-io:fast-write-byte #x01 out))
+(def-encode (+type-boolean+ (eql +bson-true+) value out)
+  (fast-io:fast-write-byte #x01 out))
 
 (defmethod decode-element ((type (eql +type-datetime+)) in)
   (let ((x (fast-io:read64-le in)))
