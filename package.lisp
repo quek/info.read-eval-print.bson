@@ -35,4 +35,6 @@
            #:+type-timestamp+
            #:+type-int64+
            #:+type-min-key+
-           #:+type-max-key+))
+           #:+type-max-key+
+
+           #:datetime))

@@ -35,11 +35,6 @@
 (assert (string= "{\"a\": {\"a\": \"b\"}}"
                  (princ-to-string (bson "a" (bson "a" "b")))))
 
-
-(encode (bson "a" "b"))
-;;⇒ #(14 0 0 0 2 97 0 1 0 0 0 98 0 0)
-
-(encode (bson "a" nil))
-;;⇒ #(13 0 0 0 4 97 0 5 0 0 0 0 0)
-
-
+(assert (local-time:timestamp=
+         (datetime 2013 1 2 3 4 5 6)
+         (value (decode (encode (bson :foo (datetime 2013 1 2 3 4 5 6 7 8)))) :foo)))

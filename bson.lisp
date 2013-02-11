@@ -329,12 +329,13 @@
 (defmethod decode-element ((type (eql +type-datetime+)) in)
   (let ((x (fast-io:read64-le in)))
     ;; x is UTC milliseconds since the Unix epoch.
-    (local-time:unix-to-timestamp (truncate x 1000) :nsec (* (mod x 1000) 1000))))
+    (multiple-value-bind (sec msec) (truncate x 1000)
+      (local-time:unix-to-timestamp sec :nsec (* msec 1000000)))))
 
 (def-encode (+type-datetime+ local-time:timestamp value out)
   (let ((unix (local-time:timestamp-to-unix value))
         (nsec (local-time:nsec-of value)))
-    (fast-io:write64-le (+ (* unix 1000) nsec) out)))
+    (fast-io:write64-le (+ (* unix 1000) (truncate nsec 1000000)) out)))
 
 (defmethod decode-element ((type (eql +type-null+)) in)
   nil)
@@ -433,3 +434,43 @@
   +bson-max-key+)
 
 (def-encode (+type-max-key+ (eql +bson-max-key+) value out))
+
+
+(defun datetime (&rest args)
+  "make local-time:timestamp.
+ (datetime)
+   ⇒ @0001-01-01T00:00:00.000000+09:00
+ (datetime 2013 2 11 11 16 1 2 3 4)
+   ⇒ @2013-02-11T11:16:01.002003+09:00
+ (datetime :year 2013 :minute 5 :timezone local-time:+utc-zone+)
+   ⇒ @2013-01-01T09:05:00.000000+09:00
+"
+  (let ((%year 1) (%month 1) (%day 1) (%hour 0) (%minute 0) (%sec 0) (%msec 0) (%usec 0) (%nsec 0)
+        (%timezone local-time:*default-timezone*) %offset keywords)
+    (loop for xs on args
+          if (keywordp (car xs))
+            do (psetf args normal-args keywords xs)
+               (loop-finish)
+          else
+            collect (car xs) into normal-args)
+    (destructuring-bind (&key year month day hour minute sec msec usec nsec timezone offset)
+        keywords
+      (macrolet ((m (sym)
+                   (let ((%sym (intern (concatenate 'string "%" (symbol-name sym)))))
+                     `(progn
+                        (when (numberp (car args))
+                          (setf ,%sym (pop args)))
+                        (when ,sym
+                          (setf ,%sym ,sym))))))
+        (m year) (m month) (m day) (m hour) (m minute) (m sec) (m msec) (m usec) (m nsec)
+        (m timezone) (m offset))
+      (local-time:encode-timestamp
+       (+ (* %msec 1000000) (* %usec 1000) %nsec) %sec %minute %hour %day %month %year
+       :timezone timezone :offset offset))))
+
+(local-time:encode-timestamp 2003 0 0 0 1 1 1)
+;;⇒ @0001-01-01T00:00:00.000000+09:00
+
+;;⇒ @0001-01-01T00:00:00.000000+09:00
+
+;;⇒ @0001-01-01T00:00:00.000002+09:00
