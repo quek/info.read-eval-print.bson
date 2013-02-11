@@ -334,7 +334,7 @@
 (def-encode (+type-datetime+ local-time:timestamp value out)
   (let ((unix (local-time:timestamp-to-unix value))
         (nsec (local-time:nsec-of value)))
-    (fast-io:write64-le (+ (* unix 1000) nsec))))
+    (fast-io:write64-le (+ (* unix 1000) nsec) out)))
 
 (defmethod decode-element ((type (eql +type-null+)) in)
   nil)
