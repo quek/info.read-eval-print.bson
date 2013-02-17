@@ -117,8 +117,11 @@
   (etypecase data
     ((simple-array (unsigned-byte 8) (12))
      (make-instance 'object-id :data data) )
-    (array
-     (object-id (coerce data '(simple-array (unsigned-byte 8) (12)))))))
+    (string
+     (object-id (loop for i from 0 to 22 by 2
+                      collect (parse-integer data :start i :end (+ 2 i) :radix 16))))
+    ((or array sequence)
+     (object-id (coerce data '(simple-array (unsigned-byte 8) (*)))))))
 
 (defclass regex ()
   ((regex :initarg :regex)

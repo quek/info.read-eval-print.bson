@@ -38,3 +38,11 @@
 (assert (local-time:timestamp=
          (datetime 2013 1 2 3 4 5 6)
          (value (decode (encode (bson :foo (datetime 2013 1 2 3 4 5 6 7 8)))) :foo)))
+
+(assert (bson=
+         (bson :_id (object-id (fast-io:octets-from #(1 2 3 4 5 6 7 8 9 10 11 12))))
+         (bson :_id (object-id #(1 2 3 4 5 6 7 8 9 10 11 12)))))
+
+(assert (bson=
+         (bson :_id (object-id (fast-io:octets-from #(1 2 3 4 5 6 7 8 9 10 11 12))))
+         (bson :_id (object-id "0102030405060708090a0b0c"))))
