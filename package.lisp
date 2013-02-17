@@ -4,6 +4,7 @@
   (:use #:cl)
   (:export #:encode #:decode #:bson #:bson= #:value
            #:regex
+           #:object-id
            #:javascript-code
            #:code-wit-scope
            #:+bson-true+

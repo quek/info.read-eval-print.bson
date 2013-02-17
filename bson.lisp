@@ -113,6 +113,13 @@
   (format stream "ObjectId(\"~{~02,'0x~}\")"
           (map 'list #'identity (slot-value object-id 'data))))
 
+(defun object-id (data)
+  (etypecase data
+    ((simple-array (unsigned-byte 8) (12))
+     (make-instance 'object-id :data data) )
+    (array
+     (object-id (coerce data '(simple-array (unsigned-byte 8) (12)))))))
+
 (defclass regex ()
   ((regex :initarg :regex)
    (options :initarg :options :initform "")))
