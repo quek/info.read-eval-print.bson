@@ -107,7 +107,7 @@
 (defclass binary-user-defined (binary-not-generic) ())
 
 (defclass object-id ()
-  ((data :initarg :data)))
+  ((data :initarg :data :accessor data)))
 
 (defmethod print-object ((object-id object-id) stream)
   (format stream "ObjectId(\"~{~02,'0x~}\")"

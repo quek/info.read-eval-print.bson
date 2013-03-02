@@ -5,6 +5,7 @@
   (:export #:encode #:decode #:bson #:bson= #:value
            #:regex
            #:object-id
+           #:data
            #:javascript-code
            #:code-wit-scope
            #:+bson-true+
