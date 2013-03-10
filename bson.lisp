@@ -238,6 +238,11 @@
     (fast-io:fast-write-sequence x out)
     (fast-io:fast-write-byte 0 out)))
 
+(defun encode-cstring (string out)
+  (let ((x (babel:string-to-octets string :encoding :utf-8)))
+    (fast-io:fast-write-sequence x out)
+    (fast-io:fast-write-byte 0 out)))
+
 (def-encode (+type-string+ string value out)
   (encode-string value out))
 
@@ -366,8 +371,8 @@
 
 (def-encode (+type-regex+ regex value out)
   (with-slots (regex options) value
-    (encode-string regex out)
-    (encode-string options out)))
+    (encode-cstring regex out)
+    (encode-cstring options out)))
 
 (defmethod decode-element ((type (eql +type-db-pointer+)) in)
   (let ((buffer (fast-io:make-octet-vector 12)))
