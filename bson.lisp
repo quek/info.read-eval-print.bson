@@ -459,33 +459,49 @@
    ⇒ @2013-02-11T11:16:01.002003+09:00
  (datetime :year 2013 :minute 5 :timezone local-time:+utc-zone+)
    ⇒ @2013-01-01T09:05:00.000000+09:00
+ (datetime \"2013-01-01 09:05:00\")
+   ⇒ @2013-01-01T18:05:00.000000+09:00
+ (datetime \"2013/01/01 09:05:00\")
+   ⇒ @2013-01-01T18:05:00.000000+09:00
+ (datetime \"20130101090500\")
+   ⇒ @2013-01-01T18:05:00.000000+09:00
 "
-  (let ((%year 1) (%month 1) (%day 1) (%hour 0) (%minute 0) (%sec 0) (%msec 0) (%usec 0) (%nsec 0)
-        (%timezone local-time:*default-timezone*) %offset keywords)
-    (loop for xs on args
-          if (keywordp (car xs))
-            do (psetf args normal-args keywords xs)
-               (loop-finish)
-          else
-            collect (car xs) into normal-args)
-    (destructuring-bind (&key year month day hour minute sec msec usec nsec timezone offset)
-        keywords
-      (macrolet ((m (sym)
-                   (let ((%sym (intern (concatenate 'string "%" (symbol-name sym)))))
-                     `(progn
-                        (when (numberp (car args))
-                          (setf ,%sym (pop args)))
-                        (when ,sym
-                          (setf ,%sym ,sym))))))
-        (m year) (m month) (m day) (m hour) (m minute) (m sec) (m msec) (m usec) (m nsec)
-        (m timezone) (m offset))
-      (local-time:encode-timestamp
-       (+ (* %msec 1000000) (* %usec 1000) %nsec) %sec %minute %hour %day %month %year
-       :timezone timezone :offset offset))))
-
-(local-time:encode-timestamp 2003 0 0 0 1 1 1)
-;;⇒ @0001-01-01T00:00:00.000000+09:00
-
-;;⇒ @0001-01-01T00:00:00.000000+09:00
-
-;;⇒ @0001-01-01T00:00:00.000002+09:00
+  (labels ((i ()
+             (let ((%year 1) (%month 1) (%day 1) (%hour 0) (%minute 0) (%sec 0) (%msec 0) (%usec 0) (%nsec 0)
+                   (%timezone local-time:*default-timezone*) %offset keywords)
+               (loop for xs on args
+                     if (keywordp (car xs))
+                       do (psetf args normal-args keywords xs)
+                          (loop-finish)
+                     else
+                       collect (car xs) into normal-args)
+               (destructuring-bind (&key year month day hour minute sec msec usec nsec timezone offset)
+                   keywords
+                 (macrolet ((m (sym)
+                              (let ((%sym (intern (concatenate 'string "%" (symbol-name sym)))))
+                                `(progn
+                                   (when (numberp (car args))
+                                     (setf ,%sym (pop args)))
+                                   (when ,sym
+                                     (setf ,%sym ,sym))))))
+                   (m year) (m month) (m day) (m hour) (m minute) (m sec) (m msec) (m usec) (m nsec)
+                   (m timezone) (m offset))
+                 (local-time:encode-timestamp
+                  (+ (* %msec 1000000) (* %usec 1000) %nsec) %sec %minute %hour %day %month %year
+                  :timezone timezone :offset offset))))
+           (s (string)
+             (or
+              ;; 2013-03-01 09:09:00
+              (local-time:parse-timestring string :fail-on-error nil :date-time-separator #\space)
+              ;; 2013/03/01 09:09:00
+              (local-time:parse-timestring string :fail-on-error nil
+                                                  :date-separator #\/ :date-time-separator #\space)
+              ;; 20130301090900
+              (ignore-errors
+               (apply #'datetime
+                      (mapcar #'parse-integer
+                              (list (subseq string 0 4) (subseq string 4 6) (subseq string 6 8)
+                                    (subseq string 8 10) (subseq string 10 12) (subseq string 12 14))))))))
+    (if (stringp (car args))
+        (s (car args))
+        (i))))
