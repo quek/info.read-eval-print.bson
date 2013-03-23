@@ -42,11 +42,17 @@
 
 (defmethod value ((bson bson) (key string))
   (with-slots (head) bson
-    (cdr (assoc key head :test #'equal))))
+    (let ((value (assoc key head :test #'equal)))
+      (if value
+          (values (cdr value) t)
+          (values nil nil)))))
 
 (defmethod value ((bson bson) (key symbol))
   (with-slots (head) bson
-    (cdr (assoc key head :test #'string-equal))))
+    (let ((value (assoc key head :test #'string-equal)))
+      (if value
+          (values (cdr value) t)
+          (values nil nil)))))
 
 (defmethod (setf value) (value (bson bson) (key string))
   (with-slots (head tail) bson
