@@ -7,5 +7,12 @@
   :license "BSD Licence"
   :components ((:file "package")
                (:file "bson"))
-  :depends-on (:fast-io :babel :ieee-floats :local-time :cl-ppcre))
+  :depends-on (:fast-io
+               :babel
+               :ieee-floats
+               :local-time
+               :cl-ppcre
+               :md5
+               :bordeaux-threads
+               :iolib))
 

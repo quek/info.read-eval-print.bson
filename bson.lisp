@@ -113,8 +113,9 @@
   (format stream "ObjectId(\"~{~02,'0x~}\")"
           (map 'list #'identity (slot-value object-id 'data))))
 
-(defun object-id (data)
+(defun object-id (&optional data)
   (etypecase data
+    (null (object-id (make-object-id-data)))
     ((simple-array (unsigned-byte 8) (12))
      (make-instance 'object-id :data data) )
     (string
@@ -122,6 +123,25 @@
                       collect (parse-integer data :start i :end (+ 2 i) :radix 16))))
     ((or array sequence)
      (object-id (coerce data '(simple-array (unsigned-byte 8) (*)))))))
+
+(let* ((lock (bt:make-lock))
+       (index 0)
+       (machine-id (subseq (md5:md5sum-string (iolib.syscalls:gethostname)) 0 3))
+       (pid (mod (iolib.syscalls:getpid) #xffff)))
+  (defun make-object-id-data ()
+    (labels ((index ()
+               (bt:with-lock-held (lock)
+                 (setf index (mod (1+ index) #xffffff)))))
+      (fast-io:with-fast-output (buffer)
+        (fast-io:writeu32-be (- (get-universal-time) #.(encode-universal-time 0 0 0 1 1 1970 0))
+                             buffer)
+        (fast-io:fast-write-sequence machine-id buffer)
+        (fast-io:writeu16-be pid buffer)
+        (fast-io:fast-write-sequence (subseq (fast-io:with-fast-output (buffer)
+                                               (fast-io:writeu32-be (index) buffer))
+                                             1 4)
+                                     buffer)))))
+
 
 (defclass regex ()
   ((regex :initarg :regex)
