@@ -65,6 +65,21 @@
 (defmethod (setf value) (value (bson bson) (key symbol))
   (setf (value bson (string-downcase key)) value))
 
+(defun map-bson (function &rest bsons)
+  (mapc (lambda (bson)
+          (with-slots (head) bson
+           (mapc (lambda (kv)
+                   (funcall function (car kv) (cdr kv)))
+                 head)))
+        bsons))
+
+(defun merge-bson (&rest bsons)
+  (let ((merged (bson)))
+    (map-bson (lambda (k v)
+                (setf (value merged k) v))
+              bsons)
+    merged))
+
 (defmethod bson= ((x bson) (y bson))
   (equalp (encode x) (encode y)))
 

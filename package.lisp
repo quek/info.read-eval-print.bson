@@ -2,7 +2,13 @@
 
 (defpackage #:info.read-eval-print.bson
   (:use #:cl)
-  (:export #:encode #:decode #:bson #:bson= #:value
+  (:export #:encode
+           #:decode
+           #:bson
+           #:bson=
+           #:value
+           #:map-bson
+           #:merge-bson
            #:regex
            #:object-id
            #:data
