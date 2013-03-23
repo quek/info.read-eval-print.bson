@@ -75,9 +75,9 @@
 
 (defun merge-bson (&rest bsons)
   (let ((merged (bson)))
-    (map-bson (lambda (k v)
-                (setf (value merged k) v))
-              bsons)
+    (apply #'map-bson (lambda (k v)
+                        (setf (value merged k) v))
+           bsons)
     merged))
 
 (defmethod bson= ((x bson) (y bson))
