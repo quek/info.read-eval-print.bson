@@ -6,7 +6,8 @@
   :author "TAHARA Yoshinori <read.eval.print@gmail.com"
   :license "BSD Licence"
   :components ((:file "package")
-               (:file "bson"))
+               (:file "bson")
+               (:file "reader"))
   :depends-on (:fast-io
                :babel
                :ieee-floats

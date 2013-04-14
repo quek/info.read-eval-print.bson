@@ -9,6 +9,7 @@
            #:value
            #:map-bson
            #:merge-bson
+           #:read-from-string-to-bson
            #:regex
            #:object-id
            #:data
