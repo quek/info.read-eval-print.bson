@@ -138,7 +138,9 @@
   (etypecase data
     (null (object-id (make-object-id-data)))
     ((simple-array (unsigned-byte 8) (12))
-     (make-instance 'object-id :data data) )
+     (make-instance 'object-id :data data))
+    (local-time:timestamp
+     (object-id (make-object-id-data :universal-time (local-time:timestamp-to-universal data))))
     (string
      (object-id (loop for i from 0 to 22 by 2
                       collect (parse-integer data :start i :end (+ 2 i) :radix 16))))
@@ -149,12 +151,12 @@
        (index 0)
        (machine-id (subseq (md5:md5sum-string (iolib.syscalls:gethostname)) 0 3))
        (pid (mod (iolib.syscalls:getpid) #xffff)))
-  (defun make-object-id-data ()
+  (defun make-object-id-data (&key (universal-time (get-universal-time)))
     (labels ((index ()
                (bt:with-lock-held (lock)
                  (setf index (mod (1+ index) #xffffff)))))
       (fast-io:with-fast-output (buffer)
-        (fast-io:writeu32-be (- (get-universal-time) #.(encode-universal-time 0 0 0 1 1 1970 0))
+        (fast-io:writeu32-be (- universal-time #.(encode-universal-time 0 0 0 1 1 1970 0))
                              buffer)
         (fast-io:fast-write-sequence machine-id buffer)
         (fast-io:writeu16-be pid buffer)
