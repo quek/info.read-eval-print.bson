@@ -51,3 +51,7 @@
   (setf (value bson :a) 1)
   (setf (value bson :a) 2)
   (assert (bson= (bson :a 2) bson)))
+
+(let ((x (bson :a 1 :b 2))
+      (y (bson :b 22 :c 33)))
+  (assert (bson= (bson :a 1 :b 22 :c 33) (merge-bson x y))))
