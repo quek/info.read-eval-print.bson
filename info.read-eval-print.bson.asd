@@ -15,5 +15,6 @@
                :cl-ppcre
                :md5
                :bordeaux-threads
-               :iolib))
+               :iolib
+               :anaphora))
 

@@ -46,3 +46,8 @@
 (assert (bson=
          (bson :_id (object-id (fast-io:octets-from #(1 2 3 4 5 6 7 8 9 10 11 12))))
          (bson :_id (object-id "0102030405060708090a0b0c"))))
+
+(let ((bson (bson)))
+  (setf (value bson :a) 1)
+  (setf (value bson :a) 2)
+  (assert (bson= (bson :a 2) bson)))

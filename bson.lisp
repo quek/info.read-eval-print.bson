@@ -56,11 +56,13 @@
 
 (defmethod (setf value) (value (bson bson) (key string))
   (with-slots (head tail) bson
-    (cond ((null head)
-           (setf head (list (cons key value)))
-           (setf tail head))
-          (t
-           (setf tail (setf (cdr tail) (list (cons key value))))))))
+    (scond ((null head)
+            (setf head (list (cons key value)))
+            (setf tail head))
+           ((assoc key head :test #'string=)
+            (setf (cdr it) value))
+           (t
+            (setf tail (setf (cdr tail) (list (cons key value))))))))
 
 (defmethod (setf value) (value (bson bson) (key symbol))
   (setf (value bson (string-downcase key)) value))

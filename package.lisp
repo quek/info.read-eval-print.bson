@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage #:info.read-eval-print.bson
-  (:use #:cl)
+  (:use #:cl #:anaphora)
   (:export #:encode
            #:decode
            #:bson
