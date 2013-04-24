@@ -31,9 +31,9 @@
   (read-delimited-list #\} stream t))
 
 (defun read-from-string-to-bson (string)
-  (let ((*readtable* (copy-readtable nil)))
+  (let ((*readtable* (copy-readtable nil))
+        (*read-eval* nil))
     (setf (readtable-case *readtable*) :preserve)
-    (setf *read-eval* nil)
     (set-macro-character #\/ #'/-reader t)
     (set-macro-character #\: #'|:-reader|)
     (set-macro-character #\, #'|,-reader|)
